@@ -3,6 +3,8 @@ from netsquid.components import (
     QuantumChannel,
     QuantumMemory,
     QSource,
+    SourceStatus,
+    Clock,
     ClassicalChannel
 )
 from netsquid.nodes.network import Network
@@ -25,12 +27,16 @@ def create_physical_network() -> Network:
     node_B = Node("B")
     repeater = Node("Repeater")
 
-    node_A.add_subcomponent(QSource(name="QSource_A", int_num_ports=2))
-    node_B.add_subcomponent(QSource(name="QSource_B", int_num_ports=2))
+    node_A.add_subcomponent(QSource(name="QSource_A"))
+    node_B.add_subcomponent(QSource(name="QSource_B"))
 
-    node_A.add_subcomponent(QuantumMemory(name="A_memory", num_positions=2, port_names=["outAqm"]))
-    node_B.add_subcomponent(QuantumMemory(name="B_memory", num_positions=2, port_names=["outBqm"]))
-    repeater.add_subcomponent(QuantumMemory(name="R_memory", num_positions=2, port_names=["inA", "inB"]))
+    # ports for qmemory communication
+    node_A.subcomponents["QSource_A"].add_ports(["qout1"])
+    node_B.subcomponents["QSource_B"].add_ports(["qout1"])
+
+    node_A.add_subcomponent(QuantumMemory(name="A_memory", num_positions=2))
+    node_B.add_subcomponent(QuantumMemory(name="B_memory", num_positions=2))
+    repeater.add_subcomponent(QuantumMemory(name="R_memory", num_positions=2))
 
     network.add_nodes([node_A, node_B, repeater])
 
@@ -48,7 +54,6 @@ def create_physical_network() -> Network:
     network.add_connection(node_A, repeater, connection=connectionA_R_classical)
     network.add_connection(node_B, repeater, connection=connectionB_R_classical)
 
-    # TODO: channel backward?
     channelAtoR_quantum = QuantumChannel(name="AtoR_channel_quantum")
     channelBtoR_quantum = QuantumChannel(name="BtoR_channel_quantum")
 
@@ -60,21 +65,27 @@ def create_physical_network() -> Network:
     node_B.subcomponents["QSource_B"].ports["qout0"].forward_output(node_B.ports[portB])
 
     # link qsource input port to qmemory output port and vice versa
-    # node_A.subcomponents["QSource_A"].ports["qout1"].connect(node_A.qmemory.ports["outAqm"])
-    # node_B.subcomponents["QSource_B"].ports["qout1"].connect(node_B.qmemory.ports["outBqm"])
+    node_A.subcomponents["QSource_A"].ports["qout1"].connect(node_A.qmemory.ports["qin0"])
+    node_B.subcomponents["QSource_B"].ports["qout1"].connect(node_B.qmemory.ports["qin0"])
 
-    repeater.ports[portRA].forward_input(repeater.qmemory.ports["inA"])
-    repeater.ports[portRB].forward_input(repeater.qmemory.ports["inB"])
+    repeater.ports[portRA].forward_input(repeater.qmemory.ports["qin0"])
+    repeater.ports[portRB].forward_input(repeater.qmemory.ports["qin1"])
 
     return network
 
 
 if __name__ == '__main__':
     network = create_physical_network()
-    create_bell_pair(network.get_node("A"))     # TODO: parallel the processes?
-    create_bell_pair(network.get_node("B"))     # TODO: qubit generation should occur within qsource
+    a = network.get_node("A")
+    b = network.get_node("B")
+    r = network.get_node("Repeater")
 
-# print(a.qmemory.peek(1))
+    clock = Clock("clock", frequency=1e9, max_ticks=1)
+    a.subcomponents["QSource_A"].status = SourceStatus.EXTERNAL
 
+    # create_bell_pair(a)     # TODO: parallel the processes?
+    # create_bell_pair(b)     # TODO: qubit generation should occur within qsource
+
+    print(a.qmemory.peek(0))
 # rounds: creation of pairs, ";" -- next round
 
