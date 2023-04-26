@@ -3,13 +3,12 @@ from netsquid.components import (
     QuantumChannel,
     QuantumMemory,
     QSource,
-    SourceStatus,
-    Clock,
     ClassicalChannel
 )
 from netsquid.nodes.network import Network
 from netsquid.nodes import Node, DirectConnection
-
+from entangle_nodes import EntangleNodes
+from netsquid import sim_run
 # ( create(A~A) ; transmit(A~A to A~R)  ||
 # create(B~B) ; transmit(B~B to B~R)  ) ; swap (A~R and B~R to AB).
 
@@ -18,6 +17,7 @@ def create_bell_pair(node: Node):
     q1, q2 = ns.qubits.create_qubits(2)
     ns.qubits.combine_qubits([q1, q2])
     node.qmemory.put([q1, q2])
+    # ns.qubits.operate(q1, ns.H)
 
 
 def create_physical_network() -> Network:
@@ -70,7 +70,6 @@ def create_physical_network() -> Network:
 
     repeater.ports[portRA].forward_input(repeater.qmemory.ports["qin0"])
     repeater.ports[portRB].forward_input(repeater.qmemory.ports["qin1"])
-
     return network
 
 
@@ -80,12 +79,22 @@ if __name__ == '__main__':
     b = network.get_node("B")
     r = network.get_node("Repeater")
 
-    clock = Clock("clock", frequency=1e9, max_ticks=1)
-    a.subcomponents["QSource_A"].status = SourceStatus.EXTERNAL
+    # clock = Clock("clock", frequency=1e9, max_ticks=1)
+    # a.subcomponents["QSource_A"].status = SourceStatus.EXTERNAL
+    # a.subcomponents["QSource_A"].trigger()
+    # await_port_input(a.qmemory.ports["qin{}".format(0)])
+    # b.subcomponents["QSource_B"].trigger()
 
     # create_bell_pair(a)     # TODO: parallel the processes?
     # create_bell_pair(b)     # TODO: qubit generation should occur within qsource
 
+    a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
+    r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol")
+
+    a_protocol.start()
+    r_protocol.start()
+
+    sim_run()
     print(a.qmemory.peek(0))
 # rounds: creation of pairs, ";" -- next round
 
