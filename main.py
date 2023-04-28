@@ -25,11 +25,10 @@ s00 = np.kron(s0, s0)
 b00 = (s00 + s11) / np.sqrt(2)
 
 
-def create_bell_pair(node: Node):
-    q1, q2 = ns.qubits.create_qubits(2)
-    ns.qubits.combine_qubits([q1, q2])
-    node.qmemory.put([q1, q2])
-    # ns.qubits.operate(q1, ns.H)
+# def create_bell_pair(node: Node):
+#     q1, q2 = ns.qubits.create_qubits(2)
+#     ns.qubits.combine_qubits([q1, q2])
+#     node.qmemory.put([q1, q2])
 
 
 def create_physical_network() -> Network:
@@ -40,9 +39,9 @@ def create_physical_network() -> Network:
     repeater = Node("Repeater")
 
     node_A.add_subcomponent(QSource(name="QSource_A", state_sampler=StateSampler([b00]),
-                                    status=SourceStatus.EXTERNAL, int_num_ports=2))
+                                    status=SourceStatus.EXTERNAL, num_ports=2))
     node_B.add_subcomponent(QSource(name="QSource_B", state_sampler=StateSampler([b00]),
-                                    status=SourceStatus.EXTERNAL, int_num_ports=2))
+                                    status=SourceStatus.EXTERNAL, num_ports=2))
 
     # ports for qmemory communication
     node_A.subcomponents["QSource_A"].add_ports(["qout1"])
@@ -79,10 +78,6 @@ def create_physical_network() -> Network:
     node_A.subcomponents["QSource_A"].ports["qout0"].forward_output(node_A.ports[portA])
     node_B.subcomponents["QSource_B"].ports["qout0"].forward_output(node_B.ports[portB])
 
-    # alice.subcomponents["QuantumSourceAlice"].ports["qout0"].forward_output(alice.ports[port_alice])
-    # alice.subcomponents["QuantumSourceAlice"].ports["qout1"].connect(alice.qmemory.ports["qin0"])
-    # bob.ports[port_bob].forward_input(bob.qmemory.ports["qin0"])
-
     # link qsource input port to qmemory output port and vice versa
     node_A.subcomponents["QSource_A"].ports["qout1"].connect(node_A.qmemory.ports["qin0"])
     node_B.subcomponents["QSource_B"].ports["qout1"].connect(node_B.qmemory.ports["qin0"])
@@ -98,19 +93,16 @@ if __name__ == '__main__':
     b = network.get_node("B")
     r = network.get_node("Repeater")
 
-    # create_bell_pair(a)     # TODO: parallel the processes?
-    # create_bell_pair(b)     # TODO: qubit generation should occur within qsource
-
     for i in range(100):
         a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
-        r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol", input_mem_pos=0)
+        r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol")
 
         a_protocol.start()
         r_protocol.start()
 
         sim_run()
-        if a.qmemory.peek([1]) or a.qmemory.peek([0]):
-            print(a.qmemory.peek([1]))
+        if r.qmemory.peek([1]) or r.qmemory.peek([0]):
+            print(r.qmemory.peek([0]))
 
 # rounds: creation of pairs, ";" -- next round
 
