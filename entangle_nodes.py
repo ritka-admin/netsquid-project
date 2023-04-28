@@ -10,7 +10,7 @@ class EntangleNodes(NodeProtocol):
     _input_mem_position: int = 0
     _qmem_input_port: Port = None
 
-    def __init__(self, on_node: node, is_source: bool, name: str, input_mem_pos: int = 1) -> None:
+    def __init__(self, on_node: node, is_source: bool, name: str, input_mem_pos: int = 0) -> None:
         """
         Constructor for the EntangleNode protocol class.
         :param on_node: Node to run this protocol on
