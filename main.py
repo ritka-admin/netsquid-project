@@ -2,11 +2,11 @@ import numpy as np
 import netsquid as ns
 from netsquid.components import (
     QuantumChannel,
-    QuantumMemory,
     QuantumProcessor,
     QSource,
     ClassicalChannel,
-    SourceStatus
+    SourceStatus,
+    INSTR_SWAP, INSTR_MEASURE_BELL
 )
 from netsquid.qubits import StateSampler
 from netsquid.nodes.network import Network
@@ -47,7 +47,6 @@ def create_physical_network() -> Network:
     node_A.subcomponents["QSource_A"].add_ports(["qout1"])
     node_B.subcomponents["QSource_B"].add_ports(["qout1"])
 
-    # TODO: fallback to nonphysical?
     node_A.add_subcomponent(QuantumProcessor(name="A_memory", num_positions=2, fallback_to_nonphysical=True))
     node_B.add_subcomponent(QuantumProcessor(name="B_memory", num_positions=2, fallback_to_nonphysical=True))
     repeater.add_subcomponent(QuantumProcessor(name="R_memory", num_positions=2, fallback_to_nonphysical=True))
@@ -93,16 +92,23 @@ if __name__ == '__main__':
     b = network.get_node("B")
     r = network.get_node("Repeater")
 
-    for i in range(100):
-        a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
-        r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol")
+    a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
+    r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol")
 
-        a_protocol.start()
-        r_protocol.start()
+    a_protocol.start()
+    r_protocol.start()
 
-        sim_run()
-        if r.qmemory.peek([1]) or r.qmemory.peek([0]):
-            print(r.qmemory.peek([0]))
+    sim_run()
+    print(r.qmemory.peek([0]))
+
+    b_protocol = EntangleNodes(on_node=b, is_source=True, name="b_protocol")
+
+    b_protocol.start()
+    r_protocol.start()
+
+    sim_run()
+    print(r.qmemory.peek([1]))
+    # print(b.qmemory.peek([0]))
 
 # rounds: creation of pairs, ";" -- next round
 
