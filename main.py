@@ -6,7 +6,7 @@ from netsquid.components import (
     QSource,
     ClassicalChannel,
     SourceStatus,
-    INSTR_SWAP, INSTR_MEASURE_BELL
+    INSTR_MEASURE_BELL
 )
 from netsquid.qubits import StateSampler
 from netsquid.nodes.network import Network
@@ -107,8 +107,20 @@ if __name__ == '__main__':
     r_protocol.start()
 
     sim_run()
-    print(r.qmemory.peek([1]))
-    # print(b.qmemory.peek([0]))
+    # print("Before swapping, position 1:", r.qmemory.peek([1]))
+    # print("Qstate1:", a.qmemory.peek([0])[0].qstate)
+    # print("Qstate1 qrepr:", a.qmemory.peek([0])[0].qstate.qrepr)
+    #
+    # print("Qstate2:", b.qmemory.peek([0])[0].qstate)
+    # print("Qstate2 qrepr:", b.qmemory.peek([0])[0].qstate.qrepr)
+
+    r.qmemory.execute_instruction(INSTR_MEASURE_BELL)
+    print("After swapping, position 1:", r.qmemory.peek([1]))
+
+    # print("Qstate after swapping:", a.qmemory.peek([0])[0].qstate)
+    # print("Qstate repr after swapping:", a.qmemory.peek([0])[0].qstate.qrepr)
+    #
+    # print(r.qmemory.peek([0, 1]))
+
 
 # rounds: creation of pairs, ";" -- next round
-
