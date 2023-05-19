@@ -1,34 +1,17 @@
-import numpy as np
-import netsquid as ns
 from netsquid.components import (
     QuantumChannel,
     QuantumProcessor,
     QSource,
     ClassicalChannel,
     SourceStatus,
-    INSTR_MEASURE_BELL
+    Port
 )
+from netsquid.protocols.nodeprotocols import NodeProtocol
+from netsquid.nodes import node
+from netsquid.nodes.network import Network, Node, DirectConnection
+# from netsquid.protocols.serviceprotocol import Signals
 from netsquid.qubits import StateSampler
-from netsquid.nodes.network import Network
-from netsquid.nodes import Node, DirectConnection
-from entangle_nodes import EntangleNodes
-from netsquid import sim_run
-
-# ( create(A~A) ; transmit(A~A to A~R)  ||
-# create(B~B) ; transmit(B~B to B~R)  ) ; swap (A~R and B~R to AB).
-
-
-s0 = np.array([[1], [0]], dtype=complex)  # |0>
-s1 = np.array([[0], [1]], dtype=complex)  # |1>
-s11 = np.kron(s1, s1)
-s00 = np.kron(s0, s0)
-b00 = (s00 + s11) / np.sqrt(2)
-
-
-# def create_bell_pair(node: Node):
-#     q1, q2 = ns.qubits.create_qubits(2)
-#     ns.qubits.combine_qubits([q1, q2])
-#     node.qmemory.put([q1, q2])
+from src.states import *
 
 
 def create_physical_network() -> Network:
@@ -86,41 +69,47 @@ def create_physical_network() -> Network:
     return network
 
 
-if __name__ == '__main__':
-    network = create_physical_network()
-    a = network.get_node("A")
-    b = network.get_node("B")
-    r = network.get_node("Repeater")
+class EntangleNodes(NodeProtocol):
+    _is_source: bool = False
+    _qsource_name: node = None
+    _input_mem_position: int = 0
+    _qmem_input_port: Port = None
 
-    a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
-    r_protocol = EntangleNodes(on_node=r, is_source=False, name="r_protocol")
+    def __init__(self, on_node: node, is_source: bool, name: str, input_mem_pos: int = 0) -> None:
+        """
+        Constructor for the EntangleNode protocol class.
+        :param on_node: Node to run this protocol on
+        :param is_source: Whether this protocol should act as a source or a receiver. Both are needed
+        :param name: Name of the protocol
+        :param input_mem_pos: Index of quantum memory position to expect incoming qubits on. Default is 0
+        """
+        super().__init__(node=on_node, name=name)
 
-    a_protocol.start()
-    r_protocol.start()
+        self._is_source = is_source
 
-    sim_run()
-    print(r.qmemory.peek([0]))
+        if not self._is_source:
+            self._input_mem_position = input_mem_pos
+            self._qmem_input_port = self.node.qmemory.ports[f"qin{self._input_mem_position}"]
+            self.node.qmemory.mem_positions[self._input_mem_position].in_use = True
 
-    b_protocol = EntangleNodes(on_node=b, is_source=True, name="b_protocol")
+    def run(self) -> None:
+        """
+        Send entangled qubits of the source and destination nodes.
+        """
+        if self._is_source:
+            self.node.subcomponents[self._qsource_name].trigger()
+        else:
+            yield self.await_port_input(self._qmem_input_port)
+            # self.send_signal(Signals.SUCCESS, self._input_mem_position)
 
-    b_protocol.start()
-    r_protocol.start()
+    @property
+    def is_connected(self) -> bool:
+        if self._is_source:
+            for name, subcomp in self.node.subcomponents.items():
+                if isinstance(subcomp, QSource):
+                    self._qsource_name = name
+                    break
+            else:
+                return False
 
-    sim_run()
-    # print("Before swapping, position 1:", r.qmemory.peek([1]))
-    # print("Qstate1:", a.qmemory.peek([0])[0].qstate)
-    # print("Qstate1 qrepr:", a.qmemory.peek([0])[0].qstate.qrepr)
-    #
-    # print("Qstate2:", b.qmemory.peek([0])[0].qstate)
-    # print("Qstate2 qrepr:", b.qmemory.peek([0])[0].qstate.qrepr)
-
-    r.qmemory.execute_instruction(INSTR_MEASURE_BELL)
-    print("After swapping, position 1:", r.qmemory.peek([1]))
-
-    # print("Qstate after swapping:", a.qmemory.peek([0])[0].qstate)
-    # print("Qstate repr after swapping:", a.qmemory.peek([0])[0].qstate.qrepr)
-    #
-    # print(r.qmemory.peek([0, 1]))
-
-
-# rounds: creation of pairs, ";" -- next round
+        return True
