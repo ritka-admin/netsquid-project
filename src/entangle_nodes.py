@@ -4,7 +4,8 @@ from netsquid.components import (
     QSource,
     ClassicalChannel,
     SourceStatus,
-    Port
+    Port,
+    INSTR_X, INSTR_Z
 )
 from netsquid.protocols.nodeprotocols import NodeProtocol
 from netsquid.nodes import node
@@ -67,6 +68,19 @@ def create_physical_network() -> Network:
     repeater.ports[portRA].forward_input(repeater.qmemory.ports["qin0"])
     repeater.ports[portRB].forward_input(repeater.qmemory.ports["qin1"])
     return network
+
+
+def perform_correction(repeater, cur_state):
+    if cur_state == 1:
+        # |01>
+        repeater.qmemory.execute_instruction(INSTR_X)
+    elif cur_state == 2:
+        # |11>
+        repeater.qmemory.execute_instruction(INSTR_Z)
+        repeater.qmemory.execute_instruction(INSTR_X)
+    elif cur_state == 3:
+        # |10>
+        repeater.qmemory.execute_instruction(INSTR_Z)
 
 
 class EntangleNodes(NodeProtocol):
