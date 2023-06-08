@@ -1,16 +1,16 @@
+from netsquid import sim_run
+from src.entangle_nodes import EntangleNodes
 from netsquid.components import (
     QuantumChannel,
     QuantumProcessor,
     QSource,
     ClassicalChannel,
     SourceStatus,
-    Port,
-    INSTR_X, INSTR_Z
+    INSTR_SWAP,
+    INSTR_MEASURE_BELL
 )
-from netsquid.protocols.nodeprotocols import NodeProtocol
-from netsquid.nodes import node
+import netsquid.qubits.ketstates
 from netsquid.nodes.network import Network, Node, DirectConnection
-# from netsquid.protocols.serviceprotocol import Signals
 from netsquid.qubits import StateSampler
 from src.states import *
 
@@ -70,72 +70,47 @@ def create_physical_network() -> Network:
     return network
 
 
-def perform_correction(endnode, cur_state):
-    if cur_state == 1:
-        # |01>
-        endnode.qmemory.execute_instruction(INSTR_X)
-    elif cur_state == 2:
-        # |11>
-        endnode.qmemory.execute_instruction(INSTR_Z)
-        endnode.qmemory.execute_instruction(INSTR_X)
-    elif cur_state == 3:
-        # |10>
-        endnode.qmemory.execute_instruction(INSTR_Z)
+if __name__ == '__main__':
+    network = create_physical_network()
+    a = network.get_node("A")
+    b = network.get_node("B")
+    r = network.get_node("Repeater")
 
+    a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
+    r_protocol = EntangleNodes(on_node=r, is_repeater=False, name="r_protocol")
+    b_protocol = EntangleNodes(on_node=b, is_source=True, is_endnode=True, name="b_protocol")
 
-class EntangleNodes(NodeProtocol):
-    _is_source: bool = False
-    _is_repeater: bool = False
-    _is_endnode: bool = False
-    _qsource_name: node = None
-    _qmem_input_ports: [Port] = []
+    # pA = [create(A~A) | | create(A~A)]; [transmit(A~A -> A~R) | | transmit(A~A -> A~R)];
+    # [distill(2 x A~R to 1 x A~R)]
 
-    def __init__(self, on_node: node, name: str, is_source: bool = False, is_repeater: bool = False,
-                 is_endnode: bool = False):
-        """
-        Constructor for the GenerateEntanglement protocol class.
+    # pB = [create(B~B) | | create(B~B)]; [transmit(B~B -> B~R) | | transmit(B~B -> B~R)];
+    # [distill(2 x B~R to 1 x B~R)]
+    for i in range(2):
+        a_protocol.start()
+        b_protocol.start()
+        r_protocol.start()
+        sim_run()
 
-        :param on_node: Node to run this protocol on
-        :param is_source: Whether this protocol should act as a source or a receiver. Both are needed
-        :param is_repeater: Whether this protocol should act as a repeater
-        :param is_endnode: Whether this protocol should act as a remote_source
-        :param name: Name of the protocol
-        """
-        super().__init__(node=on_node, name=name)
+        if i == 0:
+            a.qmemory.execute_instruction(INSTR_SWAP)
+            r.qmemory.execute_instruction(INSTR_SWAP)
 
-        self._is_source = is_source
-        self._is_repeater = is_repeater
-        self._is_endnode = is_endnode
+    res = r.qmemory.execute_instruction(INSTR_MEASURE_BELL)
 
-        if not self._is_source:
-            self._qmem_input_ports.append(self.node.qmemory.ports["qin0"])
-            self.node.qmemory.mem_positions[0].in_use = True
+    INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[0, 2])
+    INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[1, 3])
+    b_protocol = EntangleNodes(on_node=b, is_source=True, name="b_protocol")
+    for i in range(2):
+        b_protocol.start()
+        r_protocol.start()
+        sim_run()
 
-        if self._is_repeater:
-            self._qmem_input_ports.append(self.node.qmemory.ports["qin1"])
-            self.node.qmemory.mem_positions[1].in_use = True
+        if i == 0:
+            b.qmemory.execute_instruction(INSTR_SWAP)
+            r.qmemory.execute_instruction(INSTR_SWAP)
 
-    def run(self) -> None:
-        """
-        Send entangled qubits of the source to the two destination nodes.
-        """
-        if self._is_source or self._is_endnode:
-            self.node.subcomponents[self._qsource_name].trigger()
+    print("lol")
 
-        if not self._is_source:
-            yield self.await_port_input(self._qmem_input_ports[0])
-
-        if self._is_endnode:
-            yield self.await_port_input(self._qmem_input_ports[1])
-
-    @property
-    def is_connected(self) -> bool:
-        if self._is_source:
-            for name, subcomp in self.node.subcomponents.items():
-                if isinstance(subcomp, QSource):
-                    self._qsource_name = name
-                    break
-            else:
-                return False
-
-        return True
+    # distill( 2 x B~R to 1 x B~R)
+    #  pB ; [ (if distill B~R fails then rerun pB) until distill B~R succeeds]  ] ;
+    # [ swap(at R to A~B) ]
