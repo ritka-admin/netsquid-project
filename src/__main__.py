@@ -26,6 +26,10 @@ if __name__ == '__main__':
     # print("BEFORE, ket state after swapping, nodeA: ", a.qmemory.peek([0])[0].qstate.qrepr)
     # print("BEFORE, ket state after swapping, nodeB: ", b.qmemory.peek([0])[0].qstate.qrepr)
 
+    density_matrix = a.qmemory.peek([0])[0].qstate.dm
+    traced1 = partialtrace(density_matrix, [0])
+    print("1: ", traced1)
+
     measuredB = r.qmemory.execute_instruction(INSTR_MEASURE_BELL, output_key='B')
     cur_stateB = measuredB[0]['B'][0]
 
@@ -37,8 +41,9 @@ if __name__ == '__main__':
     # print("AFTER, ket state after swapping, nodeA: ", a.qmemory.peek([0])[0].qstate.qrepr)
     # print("AFTER, ket state after swapping, nodeB: ", b.qmemory.peek([0])[0].qstate.qrepr)
 
-    density_matrix = a.qmemory.peek([0])[0].qstate.qrepr.reduced_dm()
-    traced = partialtrace(density_matrix, [0, 3])  # TODO: qubits numbers? may differ from time to time?
-    print(traced)
+    density_matrix = a.qmemory.peek([0])[0].qstate.dm
+    print(a.qmemory.peek([0])[0].qstate.qubits)
+    traced = partialtrace(density_matrix, [0, 2])  # TODO: qubits numbers? may differ from time to time?
+    print("2: ", traced)
 
 # ~/.pyenv/versions/3.10.7/lib/python3.10/site-packages/netsquid/docs

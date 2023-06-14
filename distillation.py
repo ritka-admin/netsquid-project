@@ -9,7 +9,7 @@ from netsquid.components import (
     INSTR_SWAP,
     INSTR_MEASURE_BELL
 )
-import netsquid.qubits.ketstates
+# from netsquid.examples.purify import
 from netsquid.nodes.network import Network, Node, DirectConnection
 from netsquid.qubits import StateSampler
 from src.states import *
@@ -33,7 +33,7 @@ def create_physical_network() -> Network:
 
     node_A.add_subcomponent(QuantumProcessor(name="A_memory", num_positions=2, fallback_to_nonphysical=True))
     node_B.add_subcomponent(QuantumProcessor(name="B_memory", num_positions=2, fallback_to_nonphysical=True))
-    repeater.add_subcomponent(QuantumProcessor(name="R_memory", num_positions=2, fallback_to_nonphysical=True))
+    repeater.add_subcomponent(QuantumProcessor(name="R_memory", num_positions=4, fallback_to_nonphysical=True))
 
     network.add_nodes([node_A, node_B, repeater])
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     r = network.get_node("Repeater")
 
     a_protocol = EntangleNodes(on_node=a, is_source=True, name="a_protocol")
-    r_protocol = EntangleNodes(on_node=r, is_repeater=False, name="r_protocol")
+    r_protocol = EntangleNodes(on_node=r, is_repeater=True, name="r_protocol")
     b_protocol = EntangleNodes(on_node=b, is_source=True, is_endnode=True, name="b_protocol")
 
     # pA = [create(A~A) | | create(A~A)]; [transmit(A~A -> A~R) | | transmit(A~A -> A~R)];
@@ -93,23 +93,16 @@ if __name__ == '__main__':
 
         if i == 0:
             a.qmemory.execute_instruction(INSTR_SWAP)
-            r.qmemory.execute_instruction(INSTR_SWAP)
-
-    res = r.qmemory.execute_instruction(INSTR_MEASURE_BELL)
-
-    INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[0, 2])
-    INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[1, 3])
-    b_protocol = EntangleNodes(on_node=b, is_source=True, name="b_protocol")
-    for i in range(2):
-        b_protocol.start()
-        r_protocol.start()
-        sim_run()
-
-        if i == 0:
             b.qmemory.execute_instruction(INSTR_SWAP)
-            r.qmemory.execute_instruction(INSTR_SWAP)
+            INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[0, 2])
+            INSTR_SWAP.execute(quantum_memory=r.qmemory, positions=[1, 3])
 
-    print("lol")
+    # TODO: qreprs are identical, fidelity is always high
+    fidelity_A = r.qmemory.peek([2])[0].qstate.qrepr.fidelity(r.qmemory.peek([1])[0].qstate.qrepr)
+    # res = r.qmemory.execute_instruction(INSTR_MEASURE_BELL)
+    INSTR_MEASURE_BELL.execute(quantum_memory=r.qmemory, positions=[0, 1])
+    INSTR_MEASURE_BELL.execute(quantum_memory=r.qmemory, positions=[2, 3])
+    print(r.qmemory.peek([0, 1, 2, 3])[1].qstate.qrepr)
 
     # distill( 2 x B~R to 1 x B~R)
     #  pB ; [ (if distill B~R fails then rerun pB) until distill B~R succeeds]  ] ;
